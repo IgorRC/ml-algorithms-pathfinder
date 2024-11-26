@@ -50,10 +50,12 @@ El script utiliza las siguientes bibliotecas:
 
 ### 1. Clonar el repositorio
 Clona este proyecto usando Git:
-    ```bash
-    
-    ```
 
+```bash
+https://github.com/IgorRC/ml-algorithms-pathfinder.git
+```
 ### 2.- Ejecuutar en el terminal
 
-
+```bash
+python file.py
+```
