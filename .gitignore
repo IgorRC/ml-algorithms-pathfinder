@@ -1,0 +1,15 @@
+# Ignorar entornos virtuales
+.venv/
+sklearn-env/
+
+# Ignorar archivos de configuración sensibles
+.env
+
+# Ignorar caché de Python
+__pycache__/
+*.py[cod]
+
+# Ignorar archivos temporales del sistema operativo
+*.swp
+.DS_Store
+Thumbs.db
