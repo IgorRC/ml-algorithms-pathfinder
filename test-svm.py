@@ -1,12 +1,5 @@
-import os
-from dotenv import load_dotenv  
-import pandas as pd
+import numpy as np
 
-load_dotenv() 
-file_path = os.getenv('FILE_PATH_EXEL_XLSX')
+#np.random.seed(42)
 
-dataset = pd.read_excel(file_path)
-#data_describe=dataset.describe()
-print(dataset.info())
-print(dataset.head())
-print(dataset.nunique())    
+print(np.random.rand(3))

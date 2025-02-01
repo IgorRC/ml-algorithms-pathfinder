@@ -4,94 +4,112 @@ import pandas as pd
 from sklearn.model_selection import train_test_split, GridSearchCV  
 from sklearn.preprocessing import StandardScaler  
 from sklearn.svm import SVC  
-from sklearn.metrics import (confusion_matrix, 
-                             accuracy_score, 
-                             precision_score, 
-                             recall_score, 
-                             f1_score, 
-                             classification_report, 
-                             roc_auc_score, 
-                             roc_curve,
-                             auc)
+from sklearn.metrics import (accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix)
 import matplotlib.pyplot as plt  
- 
+
+# Cargar variables desde el archivo .env
 load_dotenv()  
-file_path = os.getenv('FILE_PATH')  
+file_path = os.getenv('FILE_PATH_NORMAL')  
 
 if not file_path:  
     raise ValueError("La ruta del archivo no está definida en el archivo .env")  
- 
+
+# Cargar el dataset
 dataset = pd.read_excel(file_path)  
- 
+
+# Separar las características (X) y la etiqueta (y)
 X = dataset.iloc[:, 2:]  # Características desde la columna 3 en adelante  
 y = dataset['E1']        # Etiqueta E1  
- 
-X_train, X_test, y_train, y_test = train_test_split(  
-    X, y, test_size=0.2, random_state=42, stratify=y  
-)  
- 
-scaler = StandardScaler()  
-X_train_scaled = scaler.fit_transform(X_train)  
-X_test_scaled = scaler.transform(X_test)  
 
-svm_model = SVC(random_state=42, probability=True)  # Activar la probabilidad para calcular AUC-ROC  
+# Lista de semillas para múltiples ejecuciones
+seeds = [42, 7, 21, 34, 50, 19, 73, 88, 91, 123, 3, 56, 60, 99, 101]
 
-param_grid = {  
-    'kernel': ['linear', 'rbf', 'poly'],
-    'C': [0.1, 1, 10, 100],
-    'gamma': ['scale', 'auto', 0.01, 0.1, 1, 10],
-    'degree': [3, 4]
-} 
+# Resultados acumulados
+results = []
 
-grid_search = GridSearchCV(estimator=svm_model, 
-                           param_grid=param_grid, 
-                           cv=5, 
-                           scoring='accuracy', 
-                           verbose=2)  
- 
-grid_search.fit(X_train_scaled, y_train)  
+# Bucle de ejecuciones
+for seed in seeds:
+    print(f"\nEjecución con semilla: {seed}")
+    
+    # Dividir el conjunto de datos en entrenamiento y prueba
+    X_train, X_test, y_train, y_test = train_test_split(  
+        X, y, test_size=0.2, random_state=seed, stratify=y  
+    )  
 
-print("Mejores Hiperparámetros:", grid_search.best_params_)  
-print("Mejor Puntuación:", grid_search.best_score_)  
-  
-best_model = grid_search.best_estimator_  
-y_pred = best_model.predict(X_test_scaled)  
-y_prob = best_model.predict_proba(X_test_scaled)[:, 1]  # Probabilidades de la clase positiva  
-  
-accuracy = accuracy_score(y_test, y_pred)  
-precision = precision_score(y_test, y_pred, average='macro', zero_division=0)  
-recall = recall_score(y_test, y_pred, average='macro', zero_division=0)  
-f1 = f1_score(y_test, y_pred, average='macro', zero_division=0)  
-  
-if len(y.unique()) == 2:  # Si es un problema binario  
-    auc_score = roc_auc_score(y_test, y_prob)
-    fpr, tpr, thresholds = roc_curve(y_test, y_prob)  # Curva ROC
-else:
-    auc_score = roc_auc_score(y_test, 
-                              best_model.predict_proba(X_test_scaled), 
-                              multi_class='ovr', 
-                              average='macro')
-    print(f"AUC-ROC (promedio macro): {auc_score:.2f}")     
+    # Escalar las características
+    scaler = StandardScaler()  
+    X_train_scaled = scaler.fit_transform(X_train)  
+    X_test_scaled = scaler.transform(X_test)  
 
-print(f"Accuracy: {accuracy:.2f}")  
-print(f"Precision: {precision:.2f}")  
-print(f"Recall (Sensibilidad): {recall:.2f}")  
-print(f"F1 Score: {f1:.2f}")  
-print(f"ROC-AUC Score: {auc_score:.2f}")
-print(f"############################")  
-print("Reporte de Clasificación:")  
-print(classification_report(y_test, y_pred))  
+    # Configurar el modelo base
+    svm_model = SVC(random_state=seed, probability=True)  # Activar la probabilidad para calcular AUC-ROC  
 
+    # Definir el espacio de búsqueda de hiperparámetros
+    param_grid = {  
+        'kernel': ['linear', 'rbf', 'poly'],
+        'C': [0.1, 1, 10, 100],
+        'gamma': ['scale', 'auto', 0.01, 0.1, 1, 10],
+        'degree': [3, 4]
+    } 
 
-if len(y.unique()) == 2:  
-    plt.figure(figsize=(8, 6))
-    plt.plot(fpr, tpr, color='blue', lw=2, label=f'ROC curve (area = {auc_score:.2f})')
-    plt.plot([0, 1], [0, 1], color='gray', linestyle='--')  # Línea diagonal
-    plt.xlabel('False Positive Rate (FPR)')
-    plt.ylabel('True Positive Rate (TPR)')
-    plt.title('Curva ROC')
-    plt.legend(loc="lower right")
-    plt.grid()
-    plt.show()
+    # Configurar la búsqueda de hiperparámetros con validación cruzada
+    grid_search = GridSearchCV(estimator=svm_model, 
+                               param_grid=param_grid, 
+                               cv=5, 
+                               scoring='accuracy', 
+                               verbose=0)  
 
-#print(confusion_matrix)
+    # Ajustar el modelo a los datos de entrenamiento
+    grid_search.fit(X_train_scaled, y_train)  
+
+    # Evaluar el mejor modelo en el conjunto de prueba
+    best_model = grid_search.best_estimator_  
+    y_pred = best_model.predict(X_test_scaled)  
+    y_prob = best_model.predict_proba(X_test_scaled)[:, 1]  # Probabilidades de la clase positiva  
+
+    # Calcular métricas
+    accuracy = accuracy_score(y_test, y_pred)  
+    precision = precision_score(y_test, y_pred, average='macro', zero_division=0)  
+    recall = recall_score(y_test, y_pred, average='macro', zero_division=0)  
+    f1 = f1_score(y_test, y_pred, average='macro', zero_division=0)  
+    
+    # Calcular AUC-ROC
+    if len(y.unique()) == 2:  # Si es un problema binario  
+        auc_score = roc_auc_score(y_test, y_prob)
+    else:
+        auc_score = roc_auc_score(y_test, 
+                                  best_model.predict_proba(X_test_scaled), 
+                                  multi_class='ovr', 
+                                  average='macro')
+    
+    # Calcular Especificidad
+    conf_matrix = confusion_matrix(y_test, y_pred)
+    specificity = []
+    for i in range(conf_matrix.shape[0]):  # Para cada clase
+        tn = conf_matrix.sum() - (conf_matrix[i, :].sum() + conf_matrix[:, i].sum() - conf_matrix[i, i])
+        fp = conf_matrix[:, i].sum() - conf_matrix[i, i]
+        specificity.append(tn / (tn + fp) if (tn + fp) > 0 else 0)
+    specificity_macro = sum(specificity) / len(specificity)
+
+    # Guardar los resultados junto con los hiperparámetros
+    results.append({
+        'Semilla': seed,
+        'Accuracy': accuracy,
+        'Precision': precision,
+        'Recall': recall,
+        'F1-Score': f1,
+        'AUC-ROC': auc_score,
+        'Specificity': specificity_macro,
+        'Best Params': grid_search.best_params_  # Guardar los hiperparámetros
+    })
+
+# Convertir resultados a DataFrame
+results_df = pd.DataFrame(results)
+
+# Mostrar estadísticas descriptivas
+print("\nResultados promedio y desviación estándar:")
+print(results_df.describe())
+
+# Exportar resultados a Excel
+results_df.to_excel("resultados_svm.xlsx", index=False)
+print("\nResultados exportados a 'resultados_multiples_ejecuciones_svm.xlsx'")
